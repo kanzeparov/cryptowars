@@ -1,0 +1,164 @@
+{-# STDLIB_VERSION 3 #-}
+{-# CONTENT_TYPE DAPP #-}
+{-# SCRIPT_TYPE ACCOUNT #-}
+
+let PRICE = 100000000 # 1 waves
+let PATENTPRICE = 200000000 # 2 vawes
+let ORACLE = "3MvisDfA6vNg4i6iKYWZ8bWvyP4imfBb9eq"
+let WIN = "WIN"
+let LOSE = "LOSE"
+# let PRICE = 1000000000
+
+let NONE = "none"
+func getNumberByKey(key: String) = {
+    let num = match getInteger(this, key) {
+        case a:Int => a
+        case _ => 0
+    }
+    num
+}
+func getStrByKey(key: String) = {
+    let str = match getString(this, key) {
+        case a:String => a
+        case _ => NONE
+    }
+    str
+}
+
+func validateTwoCoords(x1: Int, y1: Int, x2: Int, y2: Int) = {
+    if (x1 > x2) then false
+    else if (x1 == x2 && y1 > y2) then false
+    else true
+}
+func validateCoords(x1: Int, y1: Int, x2: Int, y2: Int, x3: Int, y3: Int, x4: Int, y4: Int, x5: Int, y5: Int, x6: Int, y6: Int) = {
+    if !validateTwoCoords(x1, y1, x2, y2) then false
+    else if !validateTwoCoords(x2, y2, x3, y3) then false
+    else if !validateTwoCoords(x3, y3, x4, y4) then false
+    else if !validateTwoCoords(x4, y4, x5, y5) then false
+    else if !validateTwoCoords(x5, y5, x6, y6) then false
+    else true
+}
+func genKeyFromCoords(x1: Int, y1: Int, x2: Int, y2: Int, x3: Int, y3: Int, x4: Int, y4: Int, x5: Int, y5: Int, x6: Int, y6: Int) = {
+    "patent:" + x1.toString() + "," + y1.toString() + ";" + x2.toString() + "," + y2.toString() + ";" + x3.toString() + "," + y3.toString() + ";" + x4.toString() + "," + y4.toString() + ";" + x5.toString() + "," + y5.toString() + ";" + x6.toString() + "," + y6.toString()
+}
+
+func getKeyBalanceUser(account: String) = {
+    account + "_balance"
+}
+func getValueBalanceUser(account:String) = {
+    getNumberByKey(getKeyBalanceUser(account))
+}
+func getKeyWinCount(user: String) = {
+    user + "_wincnt"
+}
+func getValueWinCount(user: String) = {
+    getNumberByKey(getKeyWinCount(user))
+}
+func getKeyLoseCount(user: String) = {
+    user + "_losecnt"
+}
+func getValueLoseCount(user: String) = {
+    getNumberByKey(getKeyLoseCount(user))
+}
+func getKeyGame(game: String) = {
+    "game_" + game 
+}
+func getValueGame(game: String) = {
+    getStrByKey(getKeyGame(game))
+}
+func getKeyInsuranceCount(user: String) = {
+    user + "_insurance_cnt" 
+}
+func getValueInsuranceCount(user: String) = {
+    getNumberByKey(getKeyInsuranceCount(user))
+}
+func getKeyUserPatentCount(user: String) = {
+    user + "_patent_cnt" 
+}
+func getValueUserPatentCount(user: String) = {
+    getNumberByKey(getKeyUserPatentCount(user))
+}
+
+
+@Callable(i)
+func patent(x1: Int, y1: Int, x2: Int, y2: Int, x3: Int, y3: Int, x4: Int, y4: Int, x5: Int, y5: Int, x6: Int, y6: Int) = {
+    let pmt = extract(i.payment)
+    if (isDefined(pmt.assetId)) then throw("can use WAVES only at the moment")
+    else {
+        let userAddress = toBase58String(i.caller.bytes)
+        if (pmt.amount != PRICE) then throw("purchase amount cannot be not equal to the price" )
+        else if !validateCoords(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6) then throw("invalid coordinates order")
+        else if (getStrByKey(genKeyFromCoords(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6)) != NONE) then throw("this patent is already exists")
+        else if (getValueUserPatentCount(userAddress) >= 2) then throw("you cannot have more than 2 patents")
+        else {
+            WriteSet([
+                DataEntry(genKeyFromCoords(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6), userAddress),
+                DataEntry(getKeyUserPatentCount(userAddress), getValueUserPatentCount(userAddress) + 1)
+            ])
+        }
+    }
+}
+
+@Callable(i)
+func buyPatent(x1: Int, y1: Int, x2: Int, y2: Int, x3: Int, y3: Int, x4: Int, y4: Int, x5: Int, y5: Int, x6: Int, y6: Int) = {
+    let pmt = extract(i.payment)
+    if (isDefined(pmt.assetId)) then throw("can use WAVES only at the moment")
+    else {
+        let userAddress = toBase58String(i.caller.bytes)
+        let patentOwnerAddress = getStrByKey(genKeyFromCoords(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6))
+        if (pmt.amount != PATENTPRICE) then throw("purchase amount cannot be not equal to the price" )
+        else if (!validateCoords(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6)) then throw("invalid coordinates order")
+        else if (patentOwnerAddress == NONE) then throw("there is no such patent")
+        else if (patentOwnerAddress == userAddress) then throw("you cannot buy your own patent")
+        else {
+            WriteSet([
+                DataEntry(genKeyFromCoords(x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6), userAddress),
+                DataEntry(getKeyBalanceUser(patentOwnerAddress), getValueBalanceUser(patentOwnerAddress) + pmt.amount)
+            ])
+        }
+    }
+}
+
+@Callable(i)
+func withdraw() = {
+    let userAddress = toBase58String(i.caller.bytes)
+    let balance = getValueBalanceUser(userAddress)
+    if (balance <= 0) then throw("insufficient balance")
+    else ScriptResult(
+        WriteSet([
+            DataEntry(getKeyBalanceUser(userAddress), 0)
+        ]),
+        TransferSet([ScriptTransfer(addressFromStringValue(userAddress), balance, unit)])
+    )
+}
+
+@Callable(i)
+func gameReport(game: String, winner: String, loser: String) = {
+    let oracleAddres = toBase58String(i.caller.bytes)
+    if (oracleAddres != ORACLE) then throw("only oracle can inform about games results")
+    else if (winner == loser) then throw("winner and loser must be different")
+    else if (getValueGame(game) != NONE) then throw("this game has already been played")
+    else {
+        WriteSet([
+            DataEntry(getKeyGame(game), winner + "-WIN;" + loser + "-LOSE"),
+            DataEntry(getKeyWinCount(winner), getValueWinCount(winner) + 1),
+            DataEntry(getKeyLoseCount(loser), getValueLoseCount(loser) + 1)
+        ])
+    }
+}
+
+@Callable(i)
+func insure() = {
+    let pmt = extract(i.payment)
+    let insurancePrice = fraction(PRICE, 7, 100)
+    if (isDefined(pmt.assetId)) then throw("can use WAVES only at the moment")
+    else {
+        let userAddress = toBase58String(i.caller.bytes)
+        if (pmt.amount != insurancePrice) then throw("insurance payment amount cannot be not equal to the insurance price" )
+        else {
+            WriteSet([
+                DataEntry(getKeyInsuranceCount(userAddress), getValueInsuranceCount(userAddress) + 1)
+            ])
+        }
+    }
+}
