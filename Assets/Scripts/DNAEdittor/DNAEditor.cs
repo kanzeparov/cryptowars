@@ -7,7 +7,18 @@ using System.Security.Cryptography;
 using System.Text;
 using System;
 using System.Globalization;
- 
+
+[Serializable]
+public class CustomResponse
+{
+    public int id;
+}
+
+[Serializable]
+public class CustomResponse2
+{
+    public float[] coordsx = new float[12];
+}
 
 public class DNAEditor : MonoSingleton<DNAEditor>
 {
@@ -239,7 +250,9 @@ public class DNAEditor : MonoSingleton<DNAEditor>
         if (mousePosition != Vector2.zero)
         {
             var newDNANode = Instantiate(DNANodePrefub, mousePosition, Quaternion.identity);
-            dnaNodeList.Add(newDNANode);
+            this.dnaNodeList.Add(newDNANode);
+            //Debug.Log(newDNANode.position.x);
+            //Debug.Log(newDNANode.position.y);
             updateVirusMetaInfo();
         }
     }
@@ -296,6 +309,40 @@ public class DNAEditor : MonoSingleton<DNAEditor>
 
     private IEnumerator createNewVirusAsync()
     {
+        //Proyecto26.RestClient.Get("http://ya.ru").Then(response => {
+        //    UnityEditor.EditorUtility.DisplayDialog("Response", response.Text, "Ok");
+        //});
+
+        float[] coords = new float[12] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+        int my_count = 0;
+        foreach (Transform cur_dna_node in this.dnaNodeList)
+        {
+            coords[my_count] = cur_dna_node.position.x;
+            my_count++;
+        }
+
+        var usersRoute = "http://localhost:8080/";
+        var testRoute = "https://jsonplaceholder.typicode.com/posts";
+        var newUser = 1;
+        //Proyecto26.RestClient.Post<CustomResponse>(usersRoute, newUser).Then(customResponse => {
+        //    UnityEditor.EditorUtility.DisplayDialog("JSON", JsonUtility.ToJson(customResponse, true), "Ok");
+        //});
+        Debug.Log(Proyecto26.RestClient.Post<CustomResponse>(usersRoute, this.dnaNodeList.Count).Then(customResponse => {
+            UnityEditor.EditorUtility.DisplayDialog("JSON", JsonUtility.ToJson(customResponse, true), "Ok");
+        }));
+        Debug.Log(Proyecto26.RestClient.Post<CustomResponse2>(usersRoute, coords).Then(customResponse => {
+        UnityEditor.EditorUtility.DisplayDialog("JSON", JsonUtility.ToJson(customResponse, true), "Ok");
+        }));
+        //Debug.Log(Proyecto26.RestClient.Post<CustomResponse>(testRoute, newUser).Then(customResponse => {
+        //    UnityEditor.EditorUtility.DisplayDialog("JSON", JsonUtility.ToJson(customResponse, true), "Ok");
+        //}));
+        //Debug.Log(Proyecto26.RestClient.Get("http://ya.ru"));
+
+
+        //Proyecto26.RestClient.Post("https://jsonplaceholder.typicode.com/posts", newPost).Then(response => {
+        //    UnityEditor.EditorUtility.DisplayDialog("Status", response.StatusCode.ToString(), "Ok");
+        //});
+
         var address = ConvertHexStringToByteArray("cf2cc8dcffc74cfe0a079fdbb16c0d6f78290527bfbcef935553d50746ecc00f");
 
         var newVirusContract = new NewVirusRequest(address);
